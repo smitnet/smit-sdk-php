@@ -2,6 +2,20 @@
 
 ## Auth
 
+### Important Notes
+
+#### Before you get started...
+In order to get the credentials required in order to communicate with the platform you'll need to
+contact a __SMIT. Digitaal vakmanschap__ employee by calling __+31(0)884470000__ or sending an e-mail to __support@smit.net__.
+
+These are the credentials you'll basically need __from__ SMIT:
+- Domain (provided by a SMIT employee)
+- Client ID (provided by a SMIT employee)
+- Client Secret  (provided by a SMIT employee)
+
+These are the credentials you'll need to provide __to__ SMIT:
+- Redirect URI defined by developer for handling callback (for you to provide to a SMIT employee)
+
 ### Installation
 
 Add the following repository to your `composer.json` file (without the ellipsis):
@@ -44,7 +58,7 @@ Add the following to your `composer.json`'s `require` block (without the ellipsi
 
 ### Functions
 
-#### Login
+#### Logging into the application
 
 ```php
 $client->login()
@@ -56,19 +70,19 @@ If you'd wish to login with specific scopes:
 $client->login('email', 'profile', 'big_number', '...', '...')
 ```
 
-#### Logout
+#### Logging out from the application
 
 ```php
 $client->logout()
 ```
 
-#### User information
+#### Reading user information
 
 ```php
 $client->user()
 ```
 
-#### Check if the user is logged in
+#### Checking if the user is authenticated
 
 ```php
 $client->isLoggedIn()
@@ -78,7 +92,7 @@ $client->isLoggedIn()
 
 #### Authorization code grant flow (default)
 
-1. Configure the SDk with required credentials:
+- Configure the SDk with required credentials:
     - Domain (provided by a SMIT employee)
     - Client ID (provided by a SMIT employee)
     - Client Secret  (provided by a SMIT employee)
@@ -92,9 +106,21 @@ $client->isLoggedIn()
        'redirect_uri' => 'https://your-app-or-website.test/callback(.php)',
    ]);
    ``` 
-2. Add `$client->login()` to the pages you wish the user to be authenticated.
-3. Add `$client->logout()` to the pages you wish the user to be forced to logout.
-4. Make use of `$client->user()` for a full user object or use it's easily accessible functions in order to get specific values.
+- Add `$client->login()` to the pages you wish the user to be authenticated.
+- Add `$client->logout()` to the pages you wish the user to be forced to logout.
+- Ensure your `redirect_uri` route returns the `$client->callback()` functionality,
+this will handle the `token` exchange and `logout` exchange automatically (and other possible actions in the future). 
+```php
+<?php
+
+require ***autoload***
+
+$client = new \SMIT\SDK\Auth(***);
+
+return $client->callback();
+``` 
+
+- Make use of `$client->user()` for a full user object or use it's easily accessible functions in order to get specific values.
     1. `$client->user()->getLastName()` in order to get the surname of the user.
     2. Preferably you'll want to assign `$client->user()` to a variable such as `$user` like `$user = $client->user()` for re-usability.
-5. If you want to know what scopes are available you can hit the `domain` with path `/scopes` for example `https://**xyz**.auth.smit.net/scopes` 
+- If you want to know what scopes are available you can hit the `domain` with path `/scopes` for example `https://**xyz**.auth.smit.net/scopes` 
