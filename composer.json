@@ -1,5 +1,5 @@
 {
-    "name": "smit/smit-php-sdk",
+    "name": "smit/smit-sdk-php",
     "description": "SMIT PHP SDK in order to communicate with our services",
     "keywords": [
         "smit",
