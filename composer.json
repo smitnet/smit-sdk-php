@@ -5,7 +5,7 @@
         "smit",
         "sdk"
     ],
-    "homepage": "https://gitlab.com/pietersmitmediabv/sdk/php.git",
+    "homepage": "https://gitlab.com/pietersmitmediabv/packages/smit-sdk-php.git",
     "license": "MIT",
     "authors": [
         {
