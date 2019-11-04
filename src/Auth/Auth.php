@@ -3,11 +3,6 @@
 namespace SMIT\SDK\Auth;
 
 use GuzzleHttp\Client;
-use GuzzleHttp\Handler\CurlHandler;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Middleware;
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
 use SMIT\SDK\Auth\Helpers\PreserveState;
 use SMIT\SDK\Auth\Models\ApplicationModel;
 use SMIT\SDK\Auth\Models\UserModel;
@@ -230,21 +225,7 @@ class Auth
      */
     public function client()
     {
-        $stack = new HandlerStack();
-        $stack->setHandler(new CurlHandler());
-
-        $stack->push(Middleware::mapResponse(function (ResponseInterface $response) {
-            $limit = $response->getHeader('X-RateLimit-Limit');
-            $this->rateLimit = is_array($limit) ? $limit[0] : $limit;
-
-            $remainder = $response->getHeader('X-RateLimit-Remaining');
-            $this->rateLimitRemainder = is_array($remainder) ? $remainder[0] : $remainder;
-
-            return $response;
-        }));
-
         $this->client = new Client([
-            'handler' => $stack,
             'base_uri' => $this->route('api'),
             'http_errors' => false,
             'verify' => false,
