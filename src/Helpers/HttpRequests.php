@@ -2,15 +2,58 @@
 
 namespace SMIT\SDK\Helpers;
 
-use Exception;
-use Psr\Http\Message\ResponseInterface;
+use GuzzleHttp\Client;
 use SMIT\SDK\Exceptions\BadRequestException;
 use SMIT\SDK\Exceptions\NotFoundException;
 use SMIT\SDK\Exceptions\ValidationException;
-use SMIT\SDK\Exceptions\UnauthorizedException;
 
 trait HttpRequests
 {
+    /**
+     * @var
+     */
+    private $guzzle;
+
+    /**
+     * @var array
+     */
+    private $headers = [
+        'Accept' => 'application/json',
+        'Content-Type' => 'application/json',
+    ];
+
+    /**
+     * @var array
+     */
+    private $options = [
+        'http_errors' => false,
+        'verify' => false,
+    ];
+
+    /**
+     * @param string|null $baseUri
+     * @param array $auth
+     * @return Client
+     */
+    protected function guzzle(string $baseUri = null, array $auth = [])
+    {
+        if (array_key_exists('token_type', $auth) && array_key_exists('access_token', $auth)) {
+            $this->headers['Authorization'] = sprintf('%s %s',
+                $auth['token_type'], $auth['access_token']
+            );
+        }
+
+        if (!is_null($baseUri)) {
+            $this->options['base_uri'] = $baseUri;
+        }
+
+        $this->guzzle = new Client(array_merge($this->options, [
+            'headers' => $this->headers,
+        ]));
+
+        return $this->guzzle;
+    }
+
     /**
      * @param string $uri
      *
@@ -78,7 +121,7 @@ trait HttpRequests
      */
     protected function request(string $verb, string $uri, array $payload = [])
     {
-        $response = $this->client->request($verb, $uri,
+        $response = $this->guzzle->request($verb, $uri,
             empty($payload) ? [] : ['form_params' => $payload]
         );
 
