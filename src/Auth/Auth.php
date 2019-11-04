@@ -12,6 +12,7 @@ use SMIT\SDK\Exceptions\UnauthorizedException;
 use SMIT\SDK\Exceptions\UnauthorizedScopeException;
 use SMIT\SDK\Helpers\HttpRedirects;
 use SMIT\SDK\Helpers\HttpRequests;
+use InvalidArgumentException;
 
 class Auth
 {
@@ -92,6 +93,34 @@ class Auth
             ->formatRouteMappings();
     }
 
+    /**
+     * Validate and store configuration values from an associative array.
+     *
+     * @param array $config
+     * @return $this
+     * @throws InvalidArgumentException
+     */
+    private function setConfig(array $config)
+    {
+        $requiredKeys = ['domain', 'client_id', 'client_secret', 'redirect_uri'];
+
+        foreach ($requiredKeys as $key) {
+            if (array_key_exists($key, $config)) {
+                continue;
+            }
+
+            throw new InvalidArgumentException("Missing required configuration key \"{$required}\"");
+        }
+
+        if (preg_match('/^https?:\/\/.*/', $config['domain'])) {
+            throw new InvalidArgumentException("Configuration key \"domain\" MUST NOT contain schema options");
+        }
+
+        $this->config = array_merge($this->config, $config);
+
+        return $this;
+    }
+
     private function getExceptionHandler(\Exception $exception = null)
     {
         if (!is_null($exception)) {
@@ -153,30 +182,6 @@ class Auth
     {
         return array_key_exists($key, $this->routeMappings) && !is_null($key)
             ? $this->routeMappings[$key] : $this->routeMappings;
-    }
-
-    /**
-     * Set configuration lines whilst merging with current.
-     *
-     * @param array $config
-     * @param bool $replace false
-     * @return $this
-     * @todo add validation parameters for configuration.
-     *
-     */
-    private function setConfig(array $config)
-    {
-        foreach (['domain', 'client_id', 'client_secret', 'redirect_uri'] as $required) {
-            if (!array_key_exists($required, $config)) {
-                throw new \InvalidArgumentException(
-                    sprintf('Missing required argument "%s"', $required)
-                );
-            }
-        }
-
-        $this->config = array_merge($this->config, $config);
-
-        return $this;
     }
 
     public function setStore(StoreInterface $store = null)
