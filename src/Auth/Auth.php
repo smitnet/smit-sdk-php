@@ -4,11 +4,9 @@ namespace SMIT\SDK\Auth;
 
 use GuzzleHttp\Client;
 use SMIT\SDK\Auth\Helpers\PreserveState;
-use SMIT\SDK\Auth\Models\ApplicationModel;
 use SMIT\SDK\Auth\Models\UserModel;
 use SMIT\SDK\Auth\Stores\SessionStore;
 use SMIT\SDK\Auth\Stores\StoreInterface;
-use SMIT\SDK\Exceptions\UnauthorizedException;
 use SMIT\SDK\Exceptions\UnauthorizedScopeException;
 use SMIT\SDK\Helpers\HttpRedirects;
 use SMIT\SDK\Helpers\HttpRequests;
@@ -17,21 +15,6 @@ use InvalidArgumentException;
 class Auth
 {
     use HttpRequests, HttpRedirects, PreserveState;
-
-    /**
-     * @var int
-     */
-    private $rateLimit = 60;
-
-    /**
-     * @var int
-     */
-    private $rateLimitRemainder = 60;
-
-    /**
-     * @param \GuzzleHttp\Client $client
-     */
-    protected $client;
 
     /**
      * Storage engine for persistence.
@@ -93,6 +76,17 @@ class Auth
             ->formatRouteMappings();
     }
 
+    /**
+     * @return Client
+     */
+    private function client()
+    {
+        return $this->guzzle($this->route('api'), $this->isLoggedIn() ? [
+            'token_type' => $this->store()->get($this->persistMappings['token_type']),
+            'access_token' => $this->store()->get($this->persistMappings['access_token']),
+        ] : []);
+    }
+    
     /**
      * Validate and store configuration values from an associative array.
      *
@@ -223,26 +217,6 @@ class Auth
         } catch (\Exception $exception) {
             return $this->getExceptionHandler($exception);
         }
-    }
-
-    /**
-     * @return Client
-     */
-    public function client()
-    {
-        $this->client = new Client([
-            'base_uri' => $this->route('api'),
-            'http_errors' => false,
-            'verify' => false,
-            'headers' => array_merge([
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ], [
-                'Authorization' => sprintf('Bearer %s', $this->accessToken()),
-            ]),
-        ]);
-
-        return $this->client;
     }
 
     public function store()
