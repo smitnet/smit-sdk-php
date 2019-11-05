@@ -9,4 +9,6 @@ interface StoreInterface
     public function get($key, $default = null);
 
     public function delete($key);
+
+    public function flush();
 }

@@ -24,4 +24,13 @@ class MemoryStore implements StoreInterface
     {
         unset($this->data[$key]);
     }
+
+    public function flush()
+    {
+        $this->init();
+
+        foreach (array_keys($this->data) as $key) {
+            unset($this->data[$key]);
+        }
+    }
 }

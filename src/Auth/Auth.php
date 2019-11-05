@@ -41,8 +41,9 @@ class Auth
     protected $routeMappings = [
         'api' => 'https://{{domain}}/api/{{version}}',
         'authorize' => 'https://{{domain}}/authorize',
-        'logout' => 'https://{{domain}}/api/{{version}}/logout',
+        'logout' => 'https://{{domain}}/logout',
         'token' => 'https://{{domain}}/token',
+        'verify' => 'https://{{domain}}/api/{{version}}/verify',
         'user_info' => 'https://{{domain}}/api/{{version}}/me',
         'refresh' => 'https://{{domain}}/token',
         'scopes' => 'https://{{domain}}/api/{{version}}/scopes',
@@ -74,6 +75,8 @@ class Auth
         $this->setConfig($config)
             ->setStore($store)
             ->formatRouteMappings();
+
+        $this->verify();
     }
 
     /**
@@ -200,8 +203,7 @@ class Auth
             }
 
             if (isset($_GET['error'])) {
-                switch ($_GET['error'])
-                {
+                switch ($_GET['error']) {
                     case 'invalid_scope':
                         throw new UnauthorizedScopeException(sprintf(
                             'Requested scope(s) don\'t exist: %s', implode(', ',
@@ -233,7 +235,7 @@ class Auth
     {
         $external = $this->getExternalAuthorizationScopes();
 
-        $allowed = array_filter(array_map(function($scope) use ($scopes, $external) {
+        $allowed = array_filter(array_map(function ($scope) use ($scopes, $external) {
             return !in_array($scope, array_diff($scopes, $external)) ? $scope : null;
         }, array_unique(array_merge($this->scopes(), $scopes))));
 
@@ -307,10 +309,10 @@ class Auth
     /**
      * Get the URL based on current $_SERVER settings.
      *
-     * @todo add flexibility to schema
-     *
      * @param boolean $includePath
      * @return string
+     * @todo add flexibility to schema
+     *
      */
     private function getCurrentUrl($includePath = true)
     {
@@ -323,21 +325,27 @@ class Auth
 
     /**
      * Handle any callback action.
+     *
+     * @todo catch other actions
      */
     public function callback()
     {
         if (isset($_GET['action']) && !empty($_GET['action'])) {
             switch ($_GET['action']) {
                 case 'logout':
-                    return $this->logout();
+                    $this->store()->flush();
+
+                    if ($this->getState('return_to')) {
+                        return $this->redirect($this->getState('return_to'));
+                    }
+
+                    return $this->redirect($this->getCurrentUrl());
                 case 'token':
                     return $this->getAuthorizationToken();
             }
         } else if (!empty($this->getAuthorizationCode())) {
             return $this->getAuthorizationToken();
         }
-
-        // @todo other actions should be dismissed on callback route / throw exception / redirect latest state?
     }
 
     /**
@@ -416,13 +424,24 @@ class Auth
         return false;
     }
 
+    public function verify()
+    {
+        if ($this->isLoggedIn()) {
+            $response = $this->client()->get($this->route('verify'));
+
+            if ($response->getStatusCode() !== 200) {
+                return $this->refresh();
+            }
+        }
+    }
+
     /**
      * Get the current user model otherwise authorize the request.
      *
-     * @todo add `config->persist_user` check
-     *
      * @return UserModel|void
      * @throws \Exception
+     * @todo add `config->persist_user` check
+     *
      */
     public function user()
     {
@@ -490,17 +509,33 @@ class Auth
     }
 
     /**
-     * @todo move logout process onto single sign on at all to separate current application logout or logout on all applications
-     * @todo add correct redirect url if no `return_to` state was found
+     * Federated identity is related to single sign-on (SSO),
+     * in which a user's single authentication ticket, or token,
+     * is trusted across multiple IT systems or even organizations.
+     *
+     * Thus when provided `federated` parameter to be `true` we'll ensure
+     * that the user will be logged out on all accessible systems.
+     *
+     * @param string $returnTo
+     * @param bool $federated
+     * @param array $options
+     * @return void
      */
-    public function logout()
+    public function logout(string $returnTo = null, $federated = false, array $options = [])
     {
-        $this->client()->post($this->route('logout'));
+        $this->setState([
+            'return_to' => !is_null($returnTo)
+                ? $returnTo
+                : $this->getCurrentUrl(),
+        ]);
 
-        foreach ($this->persistMappings as $persistMapping) {
-            $this->store()->delete($persistMapping);
+        if ($federated) {
+            $options['federated'] = true;
         }
 
-        return $this->redirect($this->getCurrentUrl(false));
+        return $this->redirect($this->route('logout'), array_merge([
+            'client_id' => $this->config('client_id'),
+            'state' => $this->getTransferState(),
+        ], $options));
     }
 }

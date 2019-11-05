@@ -54,6 +54,18 @@ class SessionStore implements StoreInterface
         unset($_SESSION[$this->getSessionKeyName($key)]);
     }
 
+    /**
+     * @todo remove only our own keys, this removes all sessions
+     */
+    public function flush()
+    {
+        $this->init();
+
+        foreach (array_keys($_SESSION) as $key) {
+            unset($_SESSION[$key]);
+        }
+    }
+
     private function getSessionKeyName($key)
     {
         $name = $key;
