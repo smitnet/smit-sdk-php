@@ -99,7 +99,7 @@ $client->isLoggedIn()
     - Redirect URI defined by developer for handling callback (for you to provide to a SMIT employee)
     
     ```php
-    $client = new \SMIT\SDK\Auth([
+    $client = new \SMIT\SDK\Auth\Auth([
        'domain' => 'https://**xyz**.auth.smit.net', 
        'client_id' => 'XYZ', 
        'client_secret' => 'XYZ', 
@@ -115,7 +115,7 @@ this will handle the `token` exchange and `logout` exchange automatically (and o
 
 require ***autoload***
 
-$client = new \SMIT\SDK\Auth(***);
+$client = new \SMIT\SDK\Auth\Auth(***);
 
 return $client->callback();
 ``` 
