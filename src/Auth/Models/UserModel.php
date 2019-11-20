@@ -24,7 +24,7 @@ class UserModel
      */
     public function getId() : string
     {
-        return $this->data['id'];
+        return $this->data['id'] ?? '';
     }
 
     /**
@@ -32,7 +32,7 @@ class UserModel
      */
     public function getEmail() : string
     {
-        return $this->data['email'];
+        return $this->data['email'] ?? '';
     }
 
     /**
@@ -40,7 +40,7 @@ class UserModel
      */
     public function getInitials() : string
     {
-        return $this->data['initials'];
+        return $this->data['initials'] ?? '';
     }
 
     /**
@@ -48,7 +48,7 @@ class UserModel
      */
     public function getFirstName() : string
     {
-        return $this->data['first_name'];
+        return $this->data['first_name'] ?? '';
     }
 
     /**
@@ -58,7 +58,10 @@ class UserModel
      */
     public function getLastName($withPrefix = true, $commaSeparated = false) : string
     {
-        $result = [$this->data['last_name_prefix'], $this->data['last_name']];
+        $result = [
+            $this->data['last_name_prefix'] ?? '',
+            $this->data['last_name'] ?? '',
+        ];
 
         if ($withPrefix) {
             return $commaSeparated
@@ -66,7 +69,7 @@ class UserModel
                 : trim(implode(' ', $result));
         }
 
-        return $this->data['last_name'];
+        return $this->data['last_name'] ?? '';
     }
 
     /**
@@ -133,34 +136,38 @@ class UserModel
     public function getUserMetadata()
     {
         if (array_key_exists('user_metadata', $this->data)) {
-            return $this->data['user_metadata'];
+            return $this->data['user_metadata'] ?? [];
         }
 
         return [];
     }
 
     /**
+     * @param string $defaultTimezone Europe/Amsterdam
+     *
      * @return string
      */
-    public function getTimezone() : string
+    public function getTimezone($defaultTimezone = 'Europe/Amsterdam') : string
     {
         if (array_key_exists('timezone', $this->getUserMetadata())) {
-            return $this->getUserMetadata()['timezone'];
+            return $this->getUserMetadata()['timezone'] ?? $defaultTimezone;
         }
 
-        return 'Europe/Amsterdam';
+        return $defaultTimezone;
     }
 
     /**
+     * @param string $defaultLocale nl
+     *
      * @return string
      */
-    public function getLocale() : string
+    public function getLocale($defaultLocale = 'nl') : string
     {
         if (array_key_exists('locale', $this->getUserMetadata())) {
-            return $this->getUserMetadata()['locale'];
+            return $this->getUserMetadata()['locale'] ?? $defaultLocale;
         }
 
-        return 'nl';
+        return $defaultLocale;
     }
 
     /**
@@ -169,7 +176,7 @@ class UserModel
     public function getAppMetadata()
     {
         if (array_key_exists('app_metadata', $this->data)) {
-            return $this->data['app_metadata'];
+            return $this->data['app_metadata'] ?? [];
         }
 
         return [];
@@ -181,7 +188,7 @@ class UserModel
     public function getScopes() : array
     {
         if (array_key_exists('scopes', $this->getAppMetadata())) {
-            return $this->getAppMetadata()['scopes'];
+            return $this->getAppMetadata()['scopes'] ?? [];
         }
 
         return [];
@@ -190,7 +197,7 @@ class UserModel
     public function getAttributes() : array
     {
         if (array_key_exists('attributes', $this->getUserMetadata())) {
-            return $this->getUserMetadata()['attributes'];
+            return $this->getUserMetadata()['attributes'] ?? [];
         }
 
         return [];
@@ -199,7 +206,7 @@ class UserModel
     public function getProfessions() : array
     {
         if (array_key_exists('professions', $this->getUserMetadata())) {
-            return $this->getUserMetadata()['professions'];
+            return $this->getUserMetadata()['professions'] ?? [];
         }
 
         return [];
@@ -208,7 +215,7 @@ class UserModel
     public function getRoles() : array
     {
         if (array_key_exists('roles', $this->getUserMetadata())) {
-            return $this->getUserMetadata()['roles'];
+            return $this->getUserMetadata()['roles'] ?? [];
         }
 
         return [];
@@ -217,7 +224,7 @@ class UserModel
     public function getAddresses() : array
     {
         if (array_key_exists('addresses', $this->getUserMetadata())) {
-            return $this->getUserMetadata()['addresses'];
+            return $this->getUserMetadata()['addresses'] ?? [];
         }
 
         return [];
