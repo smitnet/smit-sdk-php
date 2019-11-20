@@ -89,7 +89,7 @@ class Auth
             'access_token' => $this->store()->get($this->persistMappings['access_token']),
         ] : []);
     }
-    
+
     /**
      * Validate and store configuration values from an associative array.
      *
@@ -532,6 +532,8 @@ class Auth
         if ($federated) {
             $options['federated'] = true;
         }
+
+        $this->store()->flush();
 
         return $this->redirect($this->route('logout'), array_merge([
             'client_id' => $this->config('client_id'),
