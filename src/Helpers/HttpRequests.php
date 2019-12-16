@@ -28,6 +28,7 @@ trait HttpRequests
     private $options = [
         'http_errors' => false,
         'verify' => false,
+        'idn_conversion' => false,
     ];
 
     /**
@@ -38,8 +39,10 @@ trait HttpRequests
     protected function guzzle(string $baseUri = null, array $auth = [])
     {
         if (array_key_exists('token_type', $auth) && array_key_exists('access_token', $auth)) {
-            $this->headers['Authorization'] = sprintf('%s %s',
-                $auth['token_type'], $auth['access_token']
+            $this->headers['Authorization'] = sprintf(
+                '%s %s',
+                $auth['token_type'],
+                $auth['access_token']
             );
         }
 
@@ -121,7 +124,9 @@ trait HttpRequests
      */
     protected function request(string $verb, string $uri, array $payload = [])
     {
-        $response = $this->guzzle->request($verb, $uri,
+        $response = $this->guzzle->request(
+            $verb,
+            $uri,
             empty($payload) ? [] : ['form_params' => $payload]
         );
 
@@ -129,7 +134,7 @@ trait HttpRequests
             return $response;
         }
 
-        $responseBody = (string)$response->getBody();
+        $responseBody = (string) $response->getBody();
 
         return json_decode($responseBody, true) ?: $responseBody;
     }
@@ -144,33 +149,33 @@ trait HttpRequests
             return false;
         }
 
-        return (int)substr($response->getStatusCode(), 0, 1) === 2;
+        return (int) substr($response->getStatusCode(), 0, 1) === 2;
     }
 
-//    /**
-//     * @param ResponseInterface $response
-//     * @throws BadRequestException
-//     * @throws NotFoundException
-//     * @throws ValidationException
-//     */
-//    protected function handleRequestError(ResponseInterface $response)
-//    {
-//        if ($response->getStatusCode() === 422) {
-//            throw new ValidationException(json_decode((string)$response->getBody(), true));
-//        }
-//
-//        if ($response->getStatusCode() === 404) {
-//            throw new NotFoundException();
-//        }
-//
-//        if ($response->getStatusCode() === 400) {
-//            throw new BadRequestException((string)$response->getBody());
-//        }
-//
-//        if ($response->getStatusCode() === 401) {
-//            throw new UnauthorizedException((string)$response->getBody());
-//        }
-//
-//        throw new Exception((string)$response->getBody());
-//    }
+    //    /**
+    //     * @param ResponseInterface $response
+    //     * @throws BadRequestException
+    //     * @throws NotFoundException
+    //     * @throws ValidationException
+    //     */
+    //    protected function handleRequestError(ResponseInterface $response)
+    //    {
+    //        if ($response->getStatusCode() === 422) {
+    //            throw new ValidationException(json_decode((string)$response->getBody(), true));
+    //        }
+    //
+    //        if ($response->getStatusCode() === 404) {
+    //            throw new NotFoundException();
+    //        }
+    //
+    //        if ($response->getStatusCode() === 400) {
+    //            throw new BadRequestException((string)$response->getBody());
+    //        }
+    //
+    //        if ($response->getStatusCode() === 401) {
+    //            throw new UnauthorizedException((string)$response->getBody());
+    //        }
+    //
+    //        throw new Exception((string)$response->getBody());
+    //    }
 }
