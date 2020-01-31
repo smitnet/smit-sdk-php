@@ -7,6 +7,7 @@ use SMIT\SDK\Auth\Helpers\PreserveState;
 use SMIT\SDK\Auth\Models\UserModel;
 use SMIT\SDK\Auth\Stores\SessionStore;
 use SMIT\SDK\Auth\Stores\StoreInterface;
+use SMIT\SDK\Exceptions\UnauthorizedException;
 use SMIT\SDK\Exceptions\UnauthorizedScopeException;
 use SMIT\SDK\Helpers\HttpRedirects;
 use SMIT\SDK\Helpers\HttpRequests;
@@ -106,7 +107,7 @@ class Auth
                 continue;
             }
 
-            throw new InvalidArgumentException("Missing required configuration key \"{$required}\"");
+            throw new InvalidArgumentException("Missing required configuration key \"{$key}\"");
         }
 
         if (preg_match('/^https?:\/\/.*/', $config['domain'])) {
@@ -116,28 +117,6 @@ class Auth
         $this->config = array_merge($this->config, $config);
 
         return $this;
-    }
-
-    private function getExceptionHandler(\Exception $exception = null)
-    {
-        if (!is_null($exception)) {
-            switch (get_class($exception)) {
-                case UnauthorizedScopeException::class:
-                    $message = $exception->getMessage();
-                    break;
-                case \Exception::class:
-                    $message = 'Internal Server Error';
-                    break;
-            }
-
-            http_response_code(400);
-
-            header('Content-Type: application/json');
-
-            exit(json_encode(array_merge([
-                'status_code' => 400,
-            ], compact('message'))));
-        }
     }
 
     /**
@@ -195,30 +174,26 @@ class Auth
      */
     protected function getAuthorizationCode(string $code = null)
     {
-        try {
-            if ($this->config('response_mode') === 'query' && isset($_GET['code'])) {
-                $code = $_GET['code'];
-            } else if ($this->config('response_mode') === 'form_post' && isset($_POST['code'])) {
-                $code = $_POST['code'];
-            }
-
-            if (isset($_GET['error'])) {
-                switch ($_GET['error']) {
-                    case 'invalid_scope':
-                        throw new UnauthorizedScopeException(sprintf(
-                            'Requested scope(s) don\'t exist: %s', implode(', ',
-                                array_diff($this->scopes(), $this->getExternalAuthorizationScopes())
-                            )
-                        ));
-                }
-
-                throw new \Exception('Internal Server Error');
-            }
-
-            return $code;
-        } catch (\Exception $exception) {
-            return $this->getExceptionHandler($exception);
+        if ($this->config('response_mode') === 'query' && isset($_GET['code'])) {
+            $code = $_GET['code'];
+        } else if ($this->config('response_mode') === 'form_post' && isset($_POST['code'])) {
+            $code = $_POST['code'];
         }
+
+        if (isset($_GET['error'])) {
+            switch ($_GET['error']) {
+                case 'invalid_scope':
+                    throw new UnauthorizedScopeException(sprintf(
+                        'Requested scope(s) don\'t exist: %s', implode(', ',
+                            array_diff($this->scopes(), $this->getExternalAuthorizationScopes())
+                        )
+                    ));
+            }
+
+            throw new \Exception('Internal Server Error');
+        }
+
+        return $code;
     }
 
     public function store()
@@ -373,6 +348,19 @@ class Auth
             $this->store()->set($this->persistMappings['expires_at'], time() + $data['expires_in']);
         }
 
+        // We assume status codes over 400 will contain error messages
+        if ((int) $response->getStatusCode() > 400) {
+            if (array_key_exists('message', $data)) {
+                throw new UnauthorizedException($data['message']);
+            }
+
+            throw new UnauthorizedException(sprintf(
+                'Could not obtain authorization token: %s %s',
+                $response->getStatusCode(),
+                $response->getReasonPhrase()
+            ));
+        }
+
         if ($this->getState('return_to')) {
             return $this->redirect($this->getState('return_to'));
         }
@@ -415,7 +403,7 @@ class Auth
      *
      * @return bool
      */
-    public function isLoggedIn(): bool
+    public function isLoggedIn()
     {
         if (!empty($this->accessToken())) {
             return $this->store()->get($this->persistMappings['expires_at']) >= time();
@@ -445,26 +433,26 @@ class Auth
      */
     public function user()
     {
-        if ($this->isLoggedIn()) {
-            if (empty($this->store()->get($this->persistMappings['user_info']))) {
-                $response = $this->client()->get($this->route('user_info'));
-
-                if ($response->getStatusCode() === 200) {
-                    $json = json_decode((string)$response->getBody()->getContents(), true);
-
-                    $this->store()->set(
-                        $this->persistMappings['user_info'],
-                        array_key_exists('data', $json) ? $json['data'] : $json
-                    );
-                } else if ($response->getStatusCode() === 401) {
-                    return $this->refresh()->user();
-                }
-            }
-
-            return (new UserModel($this->store()->get($this->persistMappings['user_info'])));
+        if (!$this->isLoggedIn()) {
+            return $this->login();
         }
 
-        return $this->login();
+        if (empty($this->store()->get($this->persistMappings['user_info']))) {
+            $response = $this->client()->get($this->route('user_info'));
+
+            if ($response->getStatusCode() === 200) {
+                $json = json_decode((string)$response->getBody()->getContents(), true);
+
+                $this->store()->set(
+                    $this->persistMappings['user_info'],
+                    array_key_exists('data', $json) ? $json['data'] : $json
+                );
+            } else if ($response->getStatusCode() === 401) {
+                return $this->refresh()->user();
+            }
+        }
+
+        return (new UserModel($this->store()->get($this->persistMappings['user_info'])));
     }
 
     public function refresh()
