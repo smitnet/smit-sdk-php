@@ -2,15 +2,15 @@
 
 namespace SMIT\SDK\Auth;
 
-use GuzzleHttp\Client;
-use SMIT\SDK\Auth\Helpers\PreserveState;
-use SMIT\SDK\Auth\Models\UserModel;
-use SMIT\SDK\Auth\Stores\SessionStore;
-use SMIT\SDK\Auth\Stores\StoreInterface;
-use SMIT\SDK\Exceptions\UnauthorizedScopeException;
-use SMIT\SDK\Helpers\HttpRedirects;
 use SMIT\SDK\Helpers\HttpRequests;
+use SMIT\SDK\Helpers\HttpRedirects;
+use SMIT\SDK\Exceptions\UnauthorizedScopeException;
+use SMIT\SDK\Auth\Stores\StoreInterface;
+use SMIT\SDK\Auth\Stores\SessionStore;
+use SMIT\SDK\Auth\Models\UserModel;
+use SMIT\SDK\Auth\Helpers\PreserveState;
 use InvalidArgumentException;
+use GuzzleHttp\Client;
 
 class Auth
 {
@@ -106,7 +106,7 @@ class Auth
                 continue;
             }
 
-            throw new InvalidArgumentException("Missing required configuration key \"{$required}\"");
+            throw new InvalidArgumentException("Missing required configuration key \"{$key}\"");
         }
 
         if (preg_match('/^https?:\/\/.*/', $config['domain'])) {
@@ -198,7 +198,7 @@ class Auth
         try {
             if ($this->config('response_mode') === 'query' && isset($_GET['code'])) {
                 $code = $_GET['code'];
-            } else if ($this->config('response_mode') === 'form_post' && isset($_POST['code'])) {
+            } elseif ($this->config('response_mode') === 'form_post' && isset($_POST['code'])) {
                 $code = $_POST['code'];
             }
 
@@ -206,7 +206,9 @@ class Auth
                 switch ($_GET['error']) {
                     case 'invalid_scope':
                         throw new UnauthorizedScopeException(sprintf(
-                            'Requested scope(s) don\'t exist: %s', implode(', ',
+                            'Requested scope(s) don\'t exist: %s',
+                            implode(
+                                ', ',
                                 array_diff($this->scopes(), $this->getExternalAuthorizationScopes())
                             )
                         ));
@@ -253,7 +255,7 @@ class Auth
     {
         $response = $this->client()->get($this->route('scopes'));
 
-        return json_decode((string)$response->getBody()->getContents(), true);
+        return json_decode((string) $response->getBody()->getContents(), true);
     }
 
     /**
@@ -365,7 +367,7 @@ class Auth
         ]);
 
         if (in_array($response->getStatusCode(), [200])) {
-            $data = json_decode((string)$response->getBody()->getContents(), true);
+            $data = json_decode((string) $response->getBody()->getContents(), true);
 
             $this->store()->set($this->persistMappings['access_token'], $data['access_token']);
             $this->store()->set($this->persistMappings['refresh_token'], $data['refresh_token']);
@@ -450,7 +452,7 @@ class Auth
                 $response = $this->client()->get($this->route('user_info'));
 
                 if ($response->getStatusCode() === 200) {
-                    $json = json_decode((string)$response->getBody()->getContents(), true);
+                    $json = json_decode((string) $response->getBody()->getContents(), true);
 
                     $this->store()->set(
                         $this->persistMappings['user_info'],
@@ -481,7 +483,7 @@ class Auth
             ]);
 
             if (in_array($response->getStatusCode(), [200, 201, 204])) {
-                $data = json_decode((string)$response->getBody()->getContents(), true);
+                $data = json_decode((string) $response->getBody()->getContents(), true);
 
                 if (array_key_exists('access_token', $data)) {
                     $this->store()->set($this->persistMappings['access_token'], $data['access_token']);

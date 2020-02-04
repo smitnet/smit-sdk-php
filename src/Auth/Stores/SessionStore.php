@@ -14,18 +14,18 @@ class SessionStore implements StoreInterface
 
     public function __construct($base_name = self::BASE_NAME, $cookie_expires = self::COOKIE_EXPIRES)
     {
-        $this->session_base_name = (string)$base_name;
-        $this->session_cookie_expires = (int)$cookie_expires;
+        $this->session_base_name = (string) $base_name;
+        $this->session_cookie_expires = (int) $cookie_expires;
     }
 
     private function init()
     {
         if (!session_id()) {
             if (!empty($this->session_cookie_expires)) {
-                session_set_cookie_params($this->session_cookie_expires);
+                @session_set_cookie_params($this->session_cookie_expires);
             }
 
-            session_start();
+            @session_start();
         }
     }
 
