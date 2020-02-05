@@ -31,7 +31,7 @@ trait HttpRedirects
 
     public function getQueryString()
     {
-        return http_build_query($this->queryParameters);
+        return http_build_query($this->queryParameters, null, '&');
     }
 
     public function redirect(string $url = null, array $queryParameters = [])
