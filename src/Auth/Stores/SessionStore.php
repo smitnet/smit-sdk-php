@@ -6,7 +6,7 @@ class SessionStore implements StoreInterface
 {
     const BASE_NAME = 'smit_';
 
-    const COOKIE_EXPIRES = 2592000;
+    const COOKIE_EXPIRES = 1209600;
 
     protected $session_base_name = self::BASE_NAME;
 
@@ -45,6 +45,11 @@ class SessionStore implements StoreInterface
         }
 
         return $default;
+    }
+
+    public function has($key)
+    {
+        return !empty($this->get($key));
     }
 
     public function delete($key)

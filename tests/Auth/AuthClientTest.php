@@ -11,11 +11,14 @@ use GuzzleHttp\Psr7\Response;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Exception\RequestException;
+use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Client;
 
 class AuthClientTest extends TestCase
 {
     public static $config = [
+        'response_mode' => 'query',
+        'response_type' => 'code',
         'version' => '1.0',
     ];
 
@@ -88,25 +91,46 @@ class AuthClientTest extends TestCase
     {
         $client = new Auth(self::$config, self::$store);
 
-        $routes = $this->getProtectedPropertyValue($client, 'routeMappings');
+        $routes = $this->getPropertyValue($client, 'routeMappings');
 
         $this->assertSame(array_diff(self::$routeMappings, $routes), array_diff($routes, self::$routeMappings));
     }
 
-
-    public function testThatWeGetRedirectedToAuthorizeUrl()
+    public function testThatGetAuthorizeUrlHasCorrectCredentials()
     {
-        $mock = new MockHandler([
-            new Response(301, [], null),
-        ]);
+        $client = new Auth(self::$config, self::$store);
 
-        $handlerStack = HandlerStack::create($mock);
+        $redirect = $client->getAuthorizeUrl();
 
-        $client = new Client(['handler' => $handlerStack]);
+        $segments = parse_url($redirect);
+        $this->assertArrayHasKey('query', $segments);
 
-        $response = $client->get(self::$routeMappings['authorize']);
 
-        $this->assertEquals(301, $response->getStatusCode());
+        $query = explode('&', $segments['query']);
+        $this->dd($query);
+
+        $state = base64_encode(json_encode([]));
+        $nonce = '';
+
+        $this->dd(base64_decode($query['state']));
+        $this->assertContains(sprintf('client_id=%s', self::$config['client_id']), $query);
+        $this->assertContains(sprintf('response_mode=%s', self::$config['response_mode']), $query);
+        $this->assertContains(sprintf('response_type=%s', self::$config['response_type']), $query);
+        $this->assertContains(sprintf('state=%s', self::$config['response_type']), $query);
+        $this->assertContains(sprintf('nonce=%s', self::$config['response_type']), $query);
+
+
+        // $mock = new MockHandler([
+        //     new Response(301, [], null),
+        // ]);
+
+        // $handlerStack = HandlerStack::create($mock);
+
+        // $client = new Client(['handler' => $handlerStack]);
+
+        // $response = $client->get(self::$routeMappings['authorize']);
+
+        // $this->assertEquals(301, $response->getStatusCode());
     }
 
     // @todo test that we do not get redirected when fail from incorrect credentials

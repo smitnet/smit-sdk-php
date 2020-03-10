@@ -20,6 +20,11 @@ class MemoryStore implements StoreInterface
         return $default;
     }
 
+    public function has($key)
+    {
+        return !empty($this->get($key));
+    }
+
     public function delete($key)
     {
         unset($this->data[$key]);

@@ -12,7 +12,20 @@ abstract class TestCase extends BaseTestCase
         die(var_dump(func_get_args()));
     }
 
-    public function getProtectedPropertyValue($object, $property)
+    public static function getMethod($object, $method, $arguments = [])
+    {
+        $class = new ReflectionClass($object);
+
+        $result = $class->getMethod($method);
+
+        $result->setAccessible(true);
+
+        return count($arguments)
+            ? $result->invoke($object)
+            : $result->invokeArgs($object, $arguments);
+    }
+
+    public static function getPropertyValue($object, $property)
     {
         $reflection = new ReflectionClass($object);
 

@@ -11,8 +11,12 @@ trait PreserveState
      */
     private $preservedState = [];
 
-    public function getTransferState()
+    public function getTransientState()
     {
+        if (!count($this->preservedState)) {
+            return null;
+        }
+
         return base64_encode(json_encode($this->preservedState));
     }
 
@@ -38,8 +42,12 @@ trait PreserveState
      */
     public function setState(array $data)
     {
-        if (array_key_exists('return_to', $data)) {
-            $this->preservedState['return_to'] = $data['return_to'];
-        }
+        $state = array_merge($this->preservedState, $data);
+
+        $state = array_filter($state);
+
+        $this->preservedState = $state;
+
+        return $this;
     }
 }

@@ -2,10 +2,10 @@
 
 namespace SMIT\SDK\Helpers;
 
-use GuzzleHttp\Client;
-use SMIT\SDK\Exceptions\BadRequestException;
-use SMIT\SDK\Exceptions\NotFoundException;
 use SMIT\SDK\Exceptions\ValidationException;
+use SMIT\SDK\Exceptions\NotFoundException;
+use SMIT\SDK\Exceptions\BadRequestException;
+use GuzzleHttp\Client;
 
 trait HttpRequests
 {
@@ -151,31 +151,4 @@ trait HttpRequests
 
         return (int) substr($response->getStatusCode(), 0, 1) === 2;
     }
-
-    //    /**
-    //     * @param ResponseInterface $response
-    //     * @throws BadRequestException
-    //     * @throws NotFoundException
-    //     * @throws ValidationException
-    //     */
-    //    protected function handleRequestError(ResponseInterface $response)
-    //    {
-    //        if ($response->getStatusCode() === 422) {
-    //            throw new ValidationException(json_decode((string)$response->getBody(), true));
-    //        }
-    //
-    //        if ($response->getStatusCode() === 404) {
-    //            throw new NotFoundException();
-    //        }
-    //
-    //        if ($response->getStatusCode() === 400) {
-    //            throw new BadRequestException((string)$response->getBody());
-    //        }
-    //
-    //        if ($response->getStatusCode() === 401) {
-    //            throw new UnauthorizedException((string)$response->getBody());
-    //        }
-    //
-    //        throw new Exception((string)$response->getBody());
-    //    }
 }

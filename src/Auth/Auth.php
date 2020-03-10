@@ -5,14 +5,16 @@ namespace SMIT\SDK\Auth;
 use SMIT\SDK\Helpers\HttpRequests;
 use SMIT\SDK\Helpers\HttpRedirects;
 use SMIT\SDK\Exceptions\UnauthorizedScopeException;
+use SMIT\SDK\Exceptions\UnauthorizedException;
 use SMIT\SDK\Auth\Stores\StoreInterface;
 use SMIT\SDK\Auth\Stores\SessionStore;
 use SMIT\SDK\Auth\Models\UserModel;
 use SMIT\SDK\Auth\Helpers\PreserveState;
+use SMIT\SDK\Auth\Api\Authentication;
 use InvalidArgumentException;
 use GuzzleHttp\Client;
 
-class Auth
+class Auth implements AuthInterface
 {
     use HttpRequests, HttpRedirects, PreserveState;
 
@@ -61,6 +63,7 @@ class Auth
         'token_type' => 'token_type',
         'user_info' => 'user_info',
         'scopes' => 'scopes',
+        'nonce' => 'nonce',
     ];
 
     /**
@@ -118,28 +121,6 @@ class Auth
         return $this;
     }
 
-    private function getExceptionHandler(\Exception $exception = null)
-    {
-        if (!is_null($exception)) {
-            switch (get_class($exception)) {
-                case UnauthorizedScopeException::class:
-                    $message = $exception->getMessage();
-                    break;
-                case \Exception::class:
-                    $message = 'Internal Server Error';
-                    break;
-            }
-
-            http_response_code(400);
-
-            header('Content-Type: application/json');
-
-            exit(json_encode(array_merge([
-                'status_code' => 400,
-            ], compact('message'))));
-        }
-    }
-
     /**
      * Format route mappings with correct values.
      *
@@ -158,15 +139,29 @@ class Auth
     }
 
     /**
-     * Get config by key. Defaults to all configurations.
+     * Get configuration value by it's key.
      *
      * @param string|null $key
-     * @return array|mixed
+     * @param null|string $friendlyName
+     * @return mixed
+     * @throws InvalidArgumentException
      */
-    public function config(string $key = null)
+    public function config(string $key = null, ?string $friendlyName = null)
     {
-        return array_key_exists($key, $this->config) && !is_null($key)
-            ? $this->config[$key] : $this->config;
+        $message = sprintf(
+            '%s is mandatory',
+            !is_null($friendlyName) ? $friendlyName : $key
+        );
+
+        if (!array_key_exists($key, $this->config)) {
+            throw new InvalidArgumentException($message);
+        }
+
+        if (empty($this->config[$key])) {
+            throw new InvalidArgumentException($message);
+        }
+
+        return $this->config[$key];
     }
 
     /**
@@ -195,32 +190,28 @@ class Auth
      */
     protected function getAuthorizationCode(string $code = null)
     {
-        try {
-            if ($this->config('response_mode') === 'query' && isset($_GET['code'])) {
-                $code = $_GET['code'];
-            } elseif ($this->config('response_mode') === 'form_post' && isset($_POST['code'])) {
-                $code = $_POST['code'];
-            }
-
-            if (isset($_GET['error'])) {
-                switch ($_GET['error']) {
-                    case 'invalid_scope':
-                        throw new UnauthorizedScopeException(sprintf(
-                            'Requested scope(s) don\'t exist: %s',
-                            implode(
-                                ', ',
-                                array_diff($this->scopes(), $this->getExternalAuthorizationScopes())
-                            )
-                        ));
-                }
-
-                throw new \Exception('Internal Server Error');
-            }
-
-            return $code;
-        } catch (\Exception $exception) {
-            return $this->getExceptionHandler($exception);
+        if ($this->config('response_mode') === 'query' && isset($_GET['code'])) {
+            $code = $_GET['code'];
+        } elseif ($this->config('response_mode') === 'form_post' && isset($_POST['code'])) {
+            $code = $_POST['code'];
         }
+
+        if (isset($_GET['error'])) {
+            switch ($_GET['error']) {
+                case 'invalid_scope':
+                    throw new UnauthorizedScopeException(sprintf(
+                        'Requested scope(s) don\'t exist: %s',
+                        implode(
+                            ', ',
+                            array_diff($this->scopes(), $this->getExternalAuthorizationScopes())
+                        )
+                    ));
+            }
+
+            throw new \Exception('Internal Server Error');
+        }
+
+        return $code;
     }
 
     public function store()
@@ -261,7 +252,7 @@ class Auth
     /**
      * @return string
      */
-    private function getTransferScope()
+    private function getScope()
     {
         return count($this->scopes())
             ? implode(' ', $this->scopes())
@@ -303,8 +294,8 @@ class Auth
             'client_id' => $this->config('client_id'),
             'redirect_uri' => $this->config('redirect_uri'),
             'response_type' => $this->config('response_type'),
-            'scope' => $this->getTransferScope(),
-            'state' => $this->getTransferState(),
+            'scope' => $this->getScope(),
+            'state' => $this->getTransientState(),
         ]);
     }
 
@@ -345,7 +336,7 @@ class Auth
                 case 'token':
                     return $this->getAuthorizationToken();
             }
-        } else if (!empty($this->getAuthorizationCode())) {
+        } elseif (!empty($this->getAuthorizationCode())) {
             return $this->getAuthorizationToken();
         }
     }
@@ -362,7 +353,7 @@ class Auth
                 'client_secret' => $this->config('client_secret'),
                 'redirect_uri' => $this->config('redirect_uri'),
                 'code' => $this->getAuthorizationCode(),
-                'state' => $this->getTransferState(),
+                'state' => $this->getTransientState(),
             ],
         ]);
 
@@ -373,6 +364,19 @@ class Auth
             $this->store()->set($this->persistMappings['refresh_token'], $data['refresh_token']);
             $this->store()->set($this->persistMappings['token_type'], $data['token_type']);
             $this->store()->set($this->persistMappings['expires_at'], time() + $data['expires_in']);
+        }
+
+        // We assume status codes over 400 will contain error messages
+        if ((int) $response->getStatusCode() > 400) {
+            if (array_key_exists('message', $data)) {
+                throw new UnauthorizedException($data['message']);
+            }
+
+            throw new UnauthorizedException(sprintf(
+                'Could not obtain authorization token: %s %s',
+                $response->getStatusCode(),
+                $response->getReasonPhrase()
+            ));
         }
 
         if ($this->getState('return_to')) {
@@ -447,26 +451,26 @@ class Auth
      */
     public function user()
     {
-        if ($this->isLoggedIn()) {
-            if (empty($this->store()->get($this->persistMappings['user_info']))) {
-                $response = $this->client()->get($this->route('user_info'));
-
-                if ($response->getStatusCode() === 200) {
-                    $json = json_decode((string) $response->getBody()->getContents(), true);
-
-                    $this->store()->set(
-                        $this->persistMappings['user_info'],
-                        array_key_exists('data', $json) ? $json['data'] : $json
-                    );
-                } else if ($response->getStatusCode() === 401) {
-                    return $this->refresh()->user();
-                }
-            }
-
-            return (new UserModel($this->store()->get($this->persistMappings['user_info'])));
+        if (!$this->isLoggedIn()) {
+            return $this->login();
         }
 
-        return $this->login();
+        if (empty($this->store()->get($this->persistMappings['user_info']))) {
+            $response = $this->client()->get($this->route('user_info'));
+
+            if ($response->getStatusCode() === 200) {
+                $json = json_decode((string) $response->getBody()->getContents(), true);
+
+                $this->store()->set(
+                    $this->persistMappings['user_info'],
+                    array_key_exists('data', $json) ? $json['data'] : $json
+                );
+            } elseif ($response->getStatusCode() === 401) {
+                return $this->refresh()->user();
+            }
+        }
+
+        return (new UserModel($this->store()->get($this->persistMappings['user_info'])));
     }
 
     public function refresh()
@@ -478,7 +482,7 @@ class Auth
                     'refresh_token' => $this->refreshToken(),
                     'client_id' => $this->config('client_id'),
                     'client_secret' => $this->config('client_secret'),
-                    'scope' => $this->getTransferScope(),
+                    'scope' => $this->getScope(),
                 ],
             ]);
 
@@ -523,7 +527,7 @@ class Auth
      * @param array $options
      * @return void
      */
-    public function logout(string $returnTo = null, $federated = false, array $options = [])
+    public function logout(?string $returnTo = null, ?bool $federated = false, ?array $options = [])
     {
         $this->setState([
             'return_to' => !is_null($returnTo)
@@ -531,15 +535,133 @@ class Auth
                 : $this->getCurrentUrl(),
         ]);
 
-        if ($federated) {
-            $options['federated'] = true;
-        }
-
         $this->store()->flush();
 
-        return $this->redirect($this->route('logout'), array_merge([
-            'client_id' => $this->config('client_id'),
-            'state' => $this->getTransferState(),
-        ], $options));
+        return (new Authentication(
+            $this->getDomain(),
+            $this->getClientId()
+        ))->logout([
+            'state' => $this->getTransientState(),
+            'federated' => $federated,
+        ]);
+    }
+
+    /**
+     * The domain to authorize with.
+     *
+     * @return string
+     * @throws InvalidArgumentException
+     */
+    public function getDomain(): string
+    {
+        return $this->config('domain');
+    }
+
+    /**
+     * The client id to authorize with.
+     *
+     * @return string
+     * @throws InvalidArgumentException
+     */
+    public function getClientId(): string
+    {
+        return $this->config('client_id');
+    }
+
+    /**
+     * The response mode to authorize with.
+     *
+     * @return string
+     * @throws InvalidArgumentException
+     */
+    public function getResponseMode(): string
+    {
+        return $this->config('response_mode');
+    }
+
+    /**
+     * The response type to authorize with.
+     *
+     * @return string
+     * @throws InvalidArgumentException
+     */
+    public function getResponseType(): string
+    {
+        return $this->config('response_type');
+    }
+
+    /**
+     * The maximum storage driver lifetime in seconds.
+     *
+     * @return int
+     */
+    public function getMaxAge(): int
+    {
+        return 1209600;
+    }
+
+    /**
+     * Make transient nonce available.
+     *
+     * @return string
+     */
+    public function getTransientNonce(): string
+    {
+        $mapping = $this->persistMappings['nonce'];
+
+        // Check if there is already a nonce set, otherwise
+        // generate fresh nonce, store it and use it.
+        if (!$this->store()->has($mapping)) {
+            $this->store()->set($mapping, self::getNonce(16));
+        }
+
+        return $this->store()->get($mapping);
+    }
+
+    /**
+     * Create fresh unique nonce token.
+     *
+     * @param int $length
+     * @return string
+     */
+    private static function getNonce(int $length = 8): string
+    {
+        try {
+            $result = random_bytes($length);
+        } catch (\Exception $e) {
+            $result = openssl_random_pseudo_bytes($length);
+        }
+
+        return bin2hex($result);
+    }
+
+    public function getAuthorizeUrl($parameters = [])
+    {
+        $defaults = [
+            'scope' => $this->getScope(),
+            'client_id' => $this->getClientId(),
+            'response_mode' => $this->getResponseMode(),
+            'response_type' => $this->getResponseType(),
+            'redirect_uri' => $this->getRedirectUrl(),
+            // 'max_age' => $this->getMaxAge(),
+        ];
+
+        $parameters = array_merge($defaults, $parameters);
+
+        // $this->setState([
+        //     'return_to' => 'xyz',
+        //     'code' => '1234',
+        // ]);
+
+        // @todo create transient state: generate, store, fetch
+        $parameters['state'] = self::getTransientState();
+
+        // @todo create transient nonce: generate, store, fetch
+        $parameters['nonce'] = self::getTransientNonce();
+
+        return sprintf(
+            "{$this->routeMappings['authorize']}?%s",
+            http_build_query($parameters)
+        );
     }
 }
