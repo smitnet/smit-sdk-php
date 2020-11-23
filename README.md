@@ -25,7 +25,7 @@ Add the following repository to your `composer.json` file (without the ellipsis)
     ...
     {
         "type": "vcs",
-        "url": "git@gitlab.com:pietersmitmediabv/packages/smit-sdk-php.git"
+        "url": "git@github.com:smitnet/smit-sdk-php.git"
     }
     ...
 ]
